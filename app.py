@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestRegressor
@@ -49,14 +48,14 @@ if uploaded_file:
         st.write(df.describe())
 
         st.subheader("Korelasyon Matrisi")
-        fig, ax = plt.subplots(figsize=(10, 6))
+        fig, ax = st.plt.subplots(figsize=(10, 6))
         sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm', ax=ax)
         st.pyplot(fig)
 
         st.subheader("Dağılım Grafiği")
         num_cols = df.select_dtypes(include=np.number).columns.tolist()
         col = st.selectbox("Bir değişken seçin", num_cols)
-        fig, ax = plt.subplots()
+        fig, ax = st.plt.subplots()
         sns.histplot(df[col], kde=True, ax=ax)
         st.pyplot(fig)
 
@@ -87,7 +86,7 @@ if uploaded_file:
             kmeans = KMeans(n_clusters=3, random_state=42)
             labels = kmeans.fit_predict(X_scaled)
             df_cluster['Cluster'] = labels
-            fig, ax = plt.subplots()
+            fig, ax = st.plt.subplots()
             sns.scatterplot(data=df_cluster, x='Age', y='DaysSinceCreation', hue='Cluster', palette='Set2')
             st.pyplot(fig)
 
@@ -99,7 +98,7 @@ if uploaded_file:
         model = ARIMA(ts_series, order=(2,1,1))
         result = model.fit()
         forecast = result.predict(start=0, end=len(ts_series)+20, typ='levels')
-        fig, ax = plt.subplots()
+        fig, ax = st.plt.subplots()
         ts_series.plot(label='Gerçek', ax=ax)
         forecast.plot(label='Tahmin', ax=ax, color='red')
         ax.legend()
