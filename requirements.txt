@@ -3,9 +3,6 @@ pandas
 numpy
 matplotlib
 seaborn
-wordcloud
 scikit-learn
 pyldavis
-bertopic
 plotly
-networkx
