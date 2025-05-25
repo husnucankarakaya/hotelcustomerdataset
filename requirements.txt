@@ -6,3 +6,5 @@ seaborn
 scikit-learn
 pyldavis
 plotly
+statsmodels
+openpyxl
