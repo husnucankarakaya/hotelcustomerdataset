@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import seaborn as sns
+import matplotlib.pyplot as plt
+
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.cluster import KMeans
@@ -29,13 +31,12 @@ if uploaded_file:
 
     if menu == "CRISP-DM Süreci":
         st.header("📌 CRISP-DM Metodolojisi")
-        st.markdown('''
-        **1. İş Hedefi:** Otel yöneticilerinin müşterileri daha iyi anlaması\
-        **2. Veri Anlama:** Müşteri profili, gelir, rezervasyon durumu\
-        **3. Veri Hazırlığı:** Eksik verilerin temizlenmesi\
-        **4. Modelleştirme:** Lojistik Regresyon, Rastgele Orman, K-Means, ARIMA, KNN\
-        **5. Değerlendirme:** Doğruluk skorları ve grafiklerle inceleme\
-        **6. Dağıtım:** Bu Streamlit uygulaması''')
+        st.markdown('''**1. İş Hedefi:** Otel yöneticilerinin müşterileri daha iyi anlaması  
+**2. Veri Anlama:** Müşteri profili, gelir, rezervasyon durumu  
+**3. Veri Hazırlığı:** Eksik verilerin temizlenmesi  
+**4. Modelleştirme:** Lojistik Regresyon, Rastgele Orman, K-Means, ARIMA, KNN  
+**5. Değerlendirme:** Doğruluk skorları ve grafiklerle inceleme  
+**6. Dağıtım:** Bu Streamlit uygulaması''')
 
     elif menu == "Veri Önizleme":
         st.header("📄 Veri Önizleme")
@@ -48,16 +49,16 @@ if uploaded_file:
         st.write(df.describe())
 
         st.subheader("Korelasyon Matrisi")
-        fig, ax = st.plt.subplots(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=(10, 6))
         sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm', ax=ax)
         st.pyplot(fig)
 
         st.subheader("Dağılım Grafiği")
         num_cols = df.select_dtypes(include=np.number).columns.tolist()
         col = st.selectbox("Bir değişken seçin", num_cols)
-        fig, ax = st.plt.subplots()
-        sns.histplot(df[col], kde=True, ax=ax)
-        st.pyplot(fig)
+        fig2, ax2 = plt.subplots()
+        sns.histplot(df[col].dropna(), kde=True, ax=ax2)
+        st.pyplot(fig2)
 
     elif menu == "Makine Öğrenmesi":
         st.header("🤖 Makine Öğrenmesi")
@@ -86,23 +87,27 @@ if uploaded_file:
             kmeans = KMeans(n_clusters=3, random_state=42)
             labels = kmeans.fit_predict(X_scaled)
             df_cluster['Cluster'] = labels
-            fig, ax = st.plt.subplots()
-            sns.scatterplot(data=df_cluster, x='Age', y='DaysSinceCreation', hue='Cluster', palette='Set2')
+            fig, ax = plt.subplots()
+            sns.scatterplot(data=df_cluster, x='Age', y='DaysSinceCreation', hue='Cluster', palette='Set2', ax=ax)
             st.pyplot(fig)
 
     elif menu == "Zaman Serisi (ARIMA)":
         st.header("⏳ Zaman Serisi - ARIMA")
         ts = df[['DaysSinceCreation', 'LodgingRevenue']].dropna()
-        ts = ts.groupby('DaysSinceCreation').sum()
+        ts = ts.groupby('DaysSinceCreation').sum().sort_index()
         ts_series = ts['LodgingRevenue']
-        model = ARIMA(ts_series, order=(2,1,1))
-        result = model.fit()
-        forecast = result.predict(start=0, end=len(ts_series)+20, typ='levels')
-        fig, ax = st.plt.subplots()
-        ts_series.plot(label='Gerçek', ax=ax)
-        forecast.plot(label='Tahmin', ax=ax, color='red')
-        ax.legend()
-        st.pyplot(fig)
+
+        try:
+            model = ARIMA(ts_series, order=(2,1,1))
+            result = model.fit()
+            forecast = result.predict(start=len(ts_series), end=len(ts_series)+20, typ='levels')
+            fig, ax = plt.subplots()
+            ts_series.plot(label='Gerçek', ax=ax)
+            forecast.plot(label='Tahmin', ax=ax, color='red')
+            ax.legend()
+            st.pyplot(fig)
+        except Exception as e:
+            st.error(f"ARIMA modeli başarısız: {e}")
 
     elif menu == "Öneri Sistemi (KNN)":
         st.header("🤝 KNN Öneri Sistemi")
