@@ -120,6 +120,3 @@ if uploaded_file:
         st.dataframe(df_knn.iloc[indices[0]])
 else:
     st.warning("Lütfen bir .xlsx dosyası yükleyin.")
-
-with open("app.py", "w") as f:
-    f.write(code)
