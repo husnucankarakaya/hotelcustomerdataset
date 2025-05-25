@@ -10,6 +10,7 @@ from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 from statsmodels.tsa.arima.model import ARIMA
+
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -31,11 +32,11 @@ if uploaded_file:
 
     if menu == "CRISP-DM Süreci":
         st.header("📌 CRISP-DM Metodolojisi")
-        st.markdown('''**1. İş Hedefi:** Otel yöneticilerinin müşterileri daha iyi anlaması  
-**2. Veri Anlama:** Müşteri profili, gelir, rezervasyon durumu  
-**3. Veri Hazırlığı:** Eksik verilerin temizlenmesi  
-**4. Modelleştirme:** Lojistik Regresyon, Rastgele Orman, K-Means, ARIMA, KNN  
-**5. Değerlendirme:** Doğruluk skorları ve grafiklerle inceleme  
+        st.markdown('''**1. İş Hedefi:** Otel yöneticilerinin müşterileri daha iyi anlaması\n  
+**2. Veri Anlama:** Müşteri profili, gelir, rezervasyon durumu\n  
+**3. Veri Hazırlığı:** Eksik verilerin temizlenmesi\n  
+**4. Modelleştirme:** Lojistik Regresyon, Rastgele Orman, K-Means, ARIMA, KNN\n  
+**5. Değerlendirme:** Doğruluk skorları ve grafiklerle inceleme\n  
 **6. Dağıtım:** Bu Streamlit uygulaması''')
 
     elif menu == "Veri Önizleme":
@@ -113,9 +114,9 @@ if uploaded_file:
         st.header("🤝 KNN Öneri Sistemi")
         age = st.slider("Yaş", 18, 100, 35)
         days = st.slider("DaysSinceCreation", 0, 1000, 100)
-        lead = st.slider("AvgLeadTime", 0, 300, 50)
+        lead = st.slider("AverageLeadTime", 0, 300, 50)
 
-        df_knn = df[['Age', 'DaysSinceCreation', 'AvgLeadTime']].dropna()
+        df_knn = df[['Age', 'DaysSinceCreation', 'AverageLeadTime']].dropna()
         data_scaled = StandardScaler().fit_transform(df_knn)
         knn = NearestNeighbors(n_neighbors=3)
         knn.fit(data_scaled)
