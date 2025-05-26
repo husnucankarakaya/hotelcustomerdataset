@@ -102,7 +102,7 @@ st.markdown("""
         border-radius: 8px;
     }
     </style>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="[invalid url, do not cite] rel="stylesheet">
 """, unsafe_allow_html=True)
 
 # Session state başlatma
@@ -128,8 +128,9 @@ def load_data(file=None):
 # Eksik veri doldurma
 @st.cache_data
 def preprocess_data(df):
+    numerical_cols = df.select_dtypes(include=[np.number]).columns
     imputer = KNNImputer(n_neighbors=5)
-    df['Age'] = imputer.fit_transform(df[['Age']])
+    df[numerical_cols] = imputer.fit_transform(df[numerical_cols])
     return df
 
 # Dosya yükleyici
@@ -170,13 +171,10 @@ section = st.sidebar.selectbox("Bölüm Seçin", [
 # Filtreleme (Form ile)
 st.sidebar.header("🔍 Filtreleme")
 with st.sidebar.form(key="filter_form"):
-    # En yaygın 10 milliyet
     top_nationalities = df['Nationality'].value_counts().head(10).index.tolist()
     nationality = st.multiselect("Milliyet Seçin", top_nationalities, default=['PRT', 'FRA', 'DEU'])
-    # Tekli seçim
     market_segment = st.selectbox("Pazar Segmenti", df['MarketSegment'].unique())
     distribution_channel = st.selectbox("Dağıtım Kanalı", df['DistributionChannel'].unique())
-    # Yaş aralığı (daha az hassas)
     age_range = st.slider("Yaş Aralığı", 0, 100, (0, 100), step=5)
     submit_button = st.form_submit_button("Filtreleri Uygula")
 
@@ -367,7 +365,7 @@ elif section == "Makine Öğrenmesi Modelleri":
     st.markdown("<div class='card'>Lojistik Regresyon, Random Forest, XGBoost ve KMeans modelleri.</div>", unsafe_allow_html=True)
 
     model_option = st.selectbox("Model Seçin", ["Lojistik Regresyon", "Random Forest", "XGBoost", "K-Means Kümeleme"])
-    df_model = filtered_df.dropna()
+    df_model = filtered_df
 
     if model_option == "Lojistik Regresyon":
         st.subheader("Lojistik Regresyon - İptal Tahmini")
@@ -376,7 +374,7 @@ elif section == "Makine Öğrenmesi Modelleri":
             model = LogisticRegression()
             model.fit(X, y)
             return model
-        X = df_model[['Age', 'AverageLeadTime', 'LodgingRevenue', 'OtherRevenue', 'RoomNights']].fillna(0)
+        X = df_model[['Age', 'AverageLeadTime', 'RoomNights', 'PersonsNights']].fillna(0)
         y = df_model['BookingsCanceled'].apply(lambda x: 1 if x > 0 else 0)
         X_scaled = StandardScaler().fit_transform(X)
         X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
@@ -474,7 +472,7 @@ elif section == "Makine Öğrenmesi Modelleri":
 
     elif model_option == "K-Means Kümeleme":
         st.subheader("K-Means Kümeleme")
-        X = df_model[['Age', 'LodgingRevenue', 'OtherRevenue']].dropna().head(10000)  # İlk 10,000 satır
+        X = df_model[['Age', 'LodgingRevenue', 'OtherRevenue']].dropna().head(10000)
         X_scaled = StandardScaler().fit_transform(X)
 
         col1, col2 = st.columns(2)
@@ -486,331 +484,3 @@ elif section == "Makine Öğrenmesi Modelleri":
         n_clusters = st.slider("Küme Sayısı", 2, 10, 3)
         @st.cache_resource
         def train_kmeans(X_scaled, n_clusters):
-            kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-            kmeans.fit(X_scaled)
-            return kmeans
-        kmeans = train_kmeans(X_scaled, n_clusters)
-        df_model['Cluster'] = kmeans.predict(X_scaled)
-
-        @st.cache_data
-        def plot_kmeans_clusters(df, clusters):
-            fig = px.scatter_3d(df, x='Age', y='LodgingRevenue', z='OtherRevenue', color=clusters, 
-                                title="KMeans Kümeleri (3D)", color_continuous_scale=px.colors.qualitative.Set2)
-            fig.update_layout(template="plotly_white", font=dict(color='#1e293b'))
-            return fig
-        st.plotly_chart(plot_kmeans_clusters(df_model, df_model['Cluster']), use_container_width=True)
-
-        st.subheader("Küme Özetleri")
-        cluster_summary = df_model.groupby('Cluster').agg({
-            'Age': ['mean', 'count'],
-            'LodgingRevenue': 'mean',
-            'OtherRevenue': 'mean'
-        }).round(2)
-        st.dataframe(cluster_summary, use_container_width=True)
-
-# Hiperparametre Optimizasyonu
-elif section == "Hiperparametre Optimizasyonu":
-    st.header("⚙️ Hiperparametre Optimizasyonu")
-    model_choice = st.selectbox("Model Seçin", ["Lojistik Regresyon", "Random Forest", "XGBoost"])
-
-    if model_choice == "Lojistik Regresyon":
-        X = df[['Age', 'AverageLeadTime', 'DaysSinceFirstStay']].fillna(0)
-        y = df['BookingsCanceled'].apply(lambda x: 1 if x > 0 else 0)
-        param_grid = {'C': [0.01, 0.1, 1, 10, 100], 'solver': ['lbfgs', 'liblinear'], 'max_iter': [1000]}
-        @st.cache_resource
-        def train_grid_search(model, X, y, param_grid):
-            grid = GridSearchCV(model, param_grid, cv=5, n_jobs=-1)
-            grid.fit(X, y)
-            return grid
-        grid = train_grid_search(LogisticRegression(), X, y, param_grid)
-        st.markdown(f"""
-        <div class='card'>
-            <p><strong>En iyi parametreler:</strong> {grid.best_params_}</p>
-            <p><strong>En iyi skor:</strong> {grid.best_score_:.2f}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    elif model_choice == "Random Forest":
-        X = df[['Age', 'DaysSinceCreation', 'AverageLeadTime']].fillna(0)
-        y = df['LodgingRevenue'].fillna(0)
-        param_grid = {
-            'n_estimators': [50, 100, 200],
-            'max_depth': [None, 10, 20],
-            'min_samples_split': [2, 5]
-        }
-        grid = train_grid_search(RandomForestRegressor(random_state=42), X, y, param_grid)
-        st.markdown(f"""
-        <div class='card'>
-            <p><strong>En iyi parametreler:</strong> {grid.best_params_}</p>
-            <p><strong>En iyi skor:</strong> {grid.best_score_:.2f}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    elif model_choice == "XGBoost":
-        X = df[['Age', 'DaysSinceCreation', 'AverageLeadTime']].fillna(0)
-        y = df['LodgingRevenue'].fillna(0)
-        param_grid = {
-            'n_estimators': [50, 100, 200],
-            'max_depth': [3, 6, 9],
-            'learning_rate': [0.01, 0.1, 0.3]
-        }
-        grid = train_grid_search(xgb.XGBRegressor(random_state=42), X, y, param_grid)
-        st.markdown(f"""
-        <div class='card'>
-            <p><strong>En iyi parametreler:</strong> {grid.best_params_}</p>
-            <p><strong>En iyi skor:</strong> {grid.best_score_:.2f}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-# Zaman Serisi Analizi
-elif section == "Zaman Serisi Analizi":
-    st.header("⏱️ Zaman Serisi Analizi")
-    st.markdown("<div class='card'>ARIMA ve Prophet ile gelir tahmini.</div>", unsafe_allow_html=True)
-
-    @st.cache_data
-    def prepare_time_series(df):
-        ts_df = df[['DaysSinceCreation', 'LodgingRevenue']].dropna()
-        ts_df = ts_df.groupby('DaysSinceCreation').sum().reset_index()
-        return ts_df
-
-    ts_df = prepare_time_series(filtered_df)
-    series = ts_df['LodgingRevenue']
-
-    st.subheader("Mevsimsellik ve Trend Analizi")
-    try:
-        @st.cache_data
-        def plot_decomposition(series, period=30):
-            decomposition = seasonal_decompose(series, model='additive', period=period)
-            fig = make_subplots(rows=3, cols=1, shared_xaxes=True, subplot_titles=["Gerçek", "Trend", "Mevsimsellik"])
-            fig.add_trace(go.Scatter(x=ts_df['DaysSinceCreation'], y=decomposition.observed, mode='lines', name='Gerçek'), row=1, col=1)
-            fig.add_trace(go.Scatter(x=ts_df['DaysSinceCreation'], y=decomposition.trend, mode='lines', name='Trend'), row=2, col=1)
-            fig.add_trace(go.Scatter(x=ts_df['DaysSinceCreation'], y=decomposition.seasonal, mode='lines', name='Mevsimsellik'), row=3, col=1)
-            fig.update_layout(title="Mevsimsellik Ayrıştırma", height=600, template="plotly_white", font=dict(color='#1e293b'))
-            return fig
-        st.plotly_chart(plot_decomposition(series), use_container_width=True)
-    except Exception as e:
-        st.warning(f"Mevsimsellik analizi başarısız: {e}. Veri seti çok küçük veya periyodik değil.")
-
-    st.subheader("ARIMA Tahmini")
-    try:
-        @st.cache_resource
-        def train_arima(series):
-            model = pm.auto_arima(series, seasonal=True, m=30, stepwise=True, trace=False)
-            return model
-        model = train_arima(series)
-        forecast, conf_int = model.predict(n_periods=20, return_conf_int=True)
-        forecast_index = range(ts_df['DaysSinceCreation'].max() + 1, ts_df['DaysSinceCreation'].max() + 21)
-
-        @st.cache_data
-        def plot_arima(series, forecast, conf_int, forecast_index):
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=ts_df['DaysSinceCreation'], y=series, mode='lines', name='Gerçek', line=dict(color='#10b981')))
-            fig.add_trace(go.Scatter(x=forecast_index, y=forecast, mode='lines', name='Tahmin', line=dict(color='#f43f5e')))
-            fig.add_trace(go.Scatter(x=forecast_index, y=conf_int[:, 0], mode='lines', name='Alt CI', line=dict(color='#93c5fd', dash='dash')))
-            fig.add_trace(go.Scatter(x=forecast_index, y=conf_int[:, 1], mode='lines', name='Üst CI', line=dict(color='#93c5fd', dash='dash'), fill='tonexty'))
-            fig.update_layout(title="ARIMA Gelir Tahmini", xaxis_title="Gün", yaxis_title="Gelir", template="plotly_white", font=dict(color='#1e293b'))
-            return fig
-        st.plotly_chart(plot_arima(series, forecast, conf_int, forecast_index), use_container_width=True)
-
-        st.markdown(f"""
-        <div class='card'>
-            <p><strong>En iyi ARIMA parametreleri:</strong> {model.order}</p>
-            <p><strong>AIC:</strong> {model.aic():.2f}</p>
-        </div>
-        """, unsafe_allow_html=True)
-    except Exception as e:
-        st.error(f"ARIMA modeli başarısız: {e}. Veri seti uygun değil.")
-
-    st.subheader("Prophet Tahmini")
-    try:
-        @st.cache_data
-        def prepare_prophet_df(ts_df):
-            prophet_df = ts_df.rename(columns={'DaysSinceCreation': 'ds', 'LodgingRevenue': 'y'})
-            prophet_df['ds'] = pd.date_range(start='2020-01-01', periods=len(prophet_df), freq='D')
-            return prophet_df
-        prophet_df = prepare_prophet_df(ts_df)
-        @st.cache_resource
-        def train_prophet(prophet_df):
-            model = Prophet(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=True)
-            model.fit(prophet_df)
-            return model
-        model = train_prophet(prophet_df)
-        future = model.make_future_dataframe(periods=20)
-        forecast = model.predict(future)
-
-        @st.cache_data
-        def plot_prophet(prophet_df, forecast):
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=prophet_df['ds'], y=prophet_df['y'], mode='lines', name='Gerçek', line=dict(color='#10b981')))
-            fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], mode='lines', name='Tahmin', line=dict(color='#f43f5e')))
-            fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_lower'], mode='lines', name='Alt CI', line=dict(color='#93c5fd', dash='dash')))
-            fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_upper'], mode='lines', name='Üst CI', line=dict(color='#93c5fd', dash='dash'), fill='tonexty'))
-            fig.update_layout(title="Prophet Gelir Tahmini", xaxis_title="Tarih", yaxis_title="Gelir", template="plotly_white", font=dict(color='#1e293b'))
-            return fig
-        st.plotly_chart(plot_prophet(prophet_df, forecast), use_container_width=True)
-    except Exception as e:
-        st.error(f"Prophet modeli başarısız: {e}. Veri formatı uygun değil.")
-
-# KNN Öneri Sistemi
-elif section == "KNN Öneri Sistemi":
-    st.header("🧠 KNN Öneri Sistemi")
-    st.markdown("<div class='card'>Benzer müşteri profillerini bulma.</div>", unsafe_allow_html=True)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        age = st.slider("Yaş", 18, 90, 30, step=5)
-        days = st.slider("DaysSinceCreation", 0, 1000, 300, step=50)
-    with col2:
-        lead = st.slider("AverageLeadTime", 0, 300, 100, step=10)
-        revenue = st.slider("LodgingRevenue", 0, 5000, 500, step=100)
-
-    @st.cache_data
-    def prepare_knn_data(df):
-        df_knn = df[['Age', 'DaysSinceCreation', 'AverageLeadTime', 'LodgingRevenue']].dropna()
-        scaler = StandardScaler()
-        df_scaled = scaler.fit_transform(df_knn)
-        return df_knn, scaler, df_scaled
-    df_knn, scaler, df_scaled = prepare_knn_data(filtered_df)
-    @st.cache_resource
-    def train_knn(df_scaled):
-        knn = NearestNeighbors(n_neighbors=5, metric='euclidean')
-        knn.fit(df_scaled)
-        return knn
-    knn = train_knn(df_scaled)
-    distances, indices = knn.kneighbors(scaler.transform([[age, days, lead, revenue]]))
-
-    st.subheader("Benzer Müşteriler")
-    st.dataframe(df_knn.iloc[indices[0]], use_container_width=True)
-
-    @st.cache_data
-    def plot_knn_scatter(df_knn, indices, distances, age, revenue):
-        df_knn['Distance'] = np.nan
-        df_knn.iloc[indices[0], df_knn.columns.get_loc('Distance')] = distances[0]
-        fig = px.scatter(df_knn, x='Age', y='LodgingRevenue', size='AverageLeadTime', color='Distance', 
-                         title="Benzer Müşteriler (KNN)", color_continuous_scale='Blues', hover_data=['DaysSinceCreation'])
-        fig.add_scatter(x=[age], y=[revenue], mode='markers', marker=dict(size=20, color='red'), name='Seçilen Profil')
-        fig.update_layout(template="plotly_white", font=dict(color='#1e293b'))
-        return fig
-    st.plotly_chart(plot_knn_scatter(df_knn, indices, distances, age, revenue), use_container_width=True)
-
-# RFM Analizi
-elif section == "RFM Analizi":
-    st.header("📊 RFM Analizi")
-    st.markdown("<div class='card'>Recency, Frequency ve Monetary bazında müşteri segmentasyonu.</div>", unsafe_allow_html=True)
-
-    @st.cache_data
-    def compute_rfm(df):
-        rfm = df[['ID', 'DaysSinceLastStay', 'BookingsCheckedIn', 'LodgingRevenue', 'OtherRevenue']].copy()
-        rfm['Monetary'] = rfm['LodgingRevenue'] + rfm['OtherRevenue']
-        rfm = rfm.rename(columns={'DaysSinceLastStay': 'Recency', 'BookingsCheckedIn': 'Frequency'})
-        rfm = rfm[['ID', 'Recency', 'Frequency', 'Monetary']]
-        rfm['R_Score'] = pd.qcut(rfm['Recency'].rank(method='first'), 4, labels=[4, 3, 2, 1])
-        rfm['F_Score'] = pd.qcut(rfm['Frequency'].rank(method='first'), 4, labels=[1, 2, 3, 4])
-        rfm['M_Score'] = pd.qcut(rfm['Monetary'].rank(method='first'), 4, labels=[1, 2, 3, 4])
-        rfm['RFM_Score'] = rfm['R_Score'].astype(str) + rfm['F_Score'].astype(str) + rfm['M_Score'].astype(str)
-        return rfm
-    rfm = compute_rfm(filtered_df)
-
-    st.subheader("RFM Özeti")
-    st.dataframe(rfm.head(), use_container_width=True)
-
-    @st.cache_data
-    def plot_rfm_summary(rfm):
-        rfm_summary = rfm.groupby('RFM_Score').agg({
-            'Recency': 'mean',
-            'Frequency': 'mean',
-            'Monetary': 'mean',
-            'ID': 'count'
-        }).rename(columns={'ID': 'Count'}).reset_index()
-        fig = px.scatter_3d(rfm_summary, x='Recency', y='Frequency', z='Monetary', size='Count', color='RFM_Score',
-                            title="RFM Segmentleri (3D)", color_continuous_scale='Viridis')
-        fig.update_layout(template="plotly_white", font=dict(color='#1e293b'))
-        return fig, rfm_summary
-    fig, rfm_summary = plot_rfm_summary(rfm)
-    st.plotly_chart(fig, use_container_width=True)
-
-# Özel Talepler Analizi
-elif section == "Özel Talepler Analizi":
-    st.header("🛏️ Özel Talepler Analizi")
-    st.markdown("<div class='card'>Müşterilerin özel oda talepleri.</div>", unsafe_allow_html=True)
-
-    @st.cache_data
-    def compute_sr_counts(df):
-        sr_cols = [col for col in df.columns if col.startswith('SR')]
-        sr_counts = df[sr_cols].sum().sort_values(ascending=False)
-        return sr_cols, sr_counts
-    sr_cols, sr_counts = compute_sr_counts(filtered_df)
-
-    @st.cache_data
-    def plot_sr_bar(sr_counts):
-        fig = px.bar(x=sr_counts.index, y=sr_counts.values, title="Özel Talep Sıklıkları", 
-                     color=sr_counts.values, color_continuous_scale='Viridis', text_auto=True)
-        fig.update_layout(xaxis_title="Talep", yaxis_title="Sayı", template="plotly_white", font=dict(color='#1e293b'))
-        return fig
-    st.plotly_chart(plot_sr_bar(sr_counts), use_container_width=True)
-
-    st.subheader("Milliyet Bazında Talepler")
-    selected_nationality = st.selectbox("Milliyet Seçin", filtered_df['Nationality'].unique())
-    @st.cache_data
-    def plot_nationality_sr(df, nationality, sr_cols):
-        nationality_sr = df[df['Nationality'] == nationality][sr_cols].sum()
-        fig = px.bar(x=sr_cols, y=nationality_sr.values, title=f"{nationality} için Özel Talepler",
-                     color=nationality_sr.values, color_continuous_scale='Blues', text_auto=True)
-        fig.update_layout(xaxis_title="Talep", yaxis_title="Sayı", template="plotly_white", font=dict(color='#1e293b'))
-        return fig
-    st.plotly_chart(plot_nationality_sr(filtered_df, selected_nationality, sr_cols), use_container_width=True)
-
-# İptal/No-Show Analizi
-elif section == "İptal/No-Show Analizi":
-    st.header("🚫 İptal ve No-Show Analizi")
-    st.markdown("<div class='card'>İptal ve no-show davranışlarının analizi.</div>", unsafe_allow_html=True)
-
-    st.subheader("İptal Oranları")
-    @st.cache_data
-    def plot_cancel_rate(df):
-        cancel_rate = df.groupby('MarketSegment')['BookingsCanceled'].mean().reset_index()
-        fig = px.bar(cancel_rate, x='MarketSegment', y='BookingsCanceled', title="Pazar Segmentine Göre İptal Oranı",
-                     color='BookingsCanceled', color_continuous_scale='Reds')
-        fig.update_layout(xaxis_title="Pazar Segmenti", yaxis_title="Ortalama İptal Sayısı", template="plotly_white", font=dict(color='#1e293b'))
-        return fig
-    st.plotly_chart(plot_cancel_rate(filtered_df), use_container_width=True)
-
-    st.subheader("Yaş ve İptal İlişkisi")
-    @st.cache_data
-    def plot_age_cancel(df):
-        fig = px.scatter(df.head(10000), x='Age', y='BookingsCanceled', color='Nationality', size='LodgingRevenue',
-                         title="Yaş ve İptal İlişkisi", hover_data=['MarketSegment'])
-        fig.update_layout(template="plotly_white", font=dict(color='#1e293b'))
-        return fig
-    st.plotly_chart(plot_age_cancel(filtered_df), use_container_width=True)
-
-# Gelir Optimizasyonu
-elif section == "Gelir Optimizasyonu":
-    st.header("💰 Gelir Optimizasyonu")
-    st.markdown("<div class='card'>Gelir maximizasyonu için öneriler.</div>", unsafe_allow_html=True)
-
-    @st.cache_data
-    def plot_segment_revenue(df):
-        segment_revenue = df.groupby('MarketSegment')[['LodgingRevenue', 'OtherRevenue']].sum().reset_index()
-        fig = px.bar(segment_revenue, x='MarketSegment', y=['LodgingRevenue', 'OtherRevenue'], 
-                     title="Pazar Segmentine Göre Gelir", barmode='group', color_discrete_sequence=['#10b981', '#3b82f6'])
-        fig.update_layout(xaxis_title="Pazar Segmenti", yaxis_title="Gelir", template="plotly_white", font=dict(color='#1e293b'))
-        return fig, segment_revenue
-    fig, segment_revenue = plot_segment_revenue(filtered_df)
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.subheader("Öneriler")
-    high_revenue_segments = segment_revenue[segment_revenue['LodgingRevenue'] > segment_revenue['LodgingRevenue'].median()]['MarketSegment'].tolist()
-    st.markdown(f"""
-    <div class='card'>
-        <p><strong>Yüksek Gelir Getiren Segmentler:</strong> {', '.join(high_revenue_segments)}</p>
-        <p><strong>Öneri:</strong> Bu segmentlere yönelik pazarlama kampanyaları düzenleyin ve özel teklifler sunun.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-# Footer
-st.markdown("""
-    <div class='footer'>
-        <p>Otel Müşteri Analiz Paneli - Powered by Streamlit & xAI | Version 2.0.0</p>
-    </div>
-""", unsafe_allow_html=True)
