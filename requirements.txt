@@ -1,8 +1,14 @@
 streamlit
 pandas
 numpy
+plotly.express
+plotly.graph_objects
 matplotlib
+pmdarima
+matplotlib.pyplot
 seaborn
 scikit-learn
+uuid
+warnings
 statsmodels
 openpyxl
